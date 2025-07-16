@@ -1,33 +1,24 @@
+import numpy as np
+
 def interpolate_distance(df, weight, altitude, temperature):
-    subset = df[
-        (df["PressureAltitude"] == altitude) &
-        (df["OAT"] == temperature)
-    ]
+    # Pivot to 3D grid
+    points = df[["Weight", "PressureAltitude", "OAT"]].values
+    distances = df["Distance"].values
 
-    if subset.empty:
-        return 0, []  # No matching data at all
+    # Build input vector
+    input_point = np.array([weight, altitude, temperature])
 
-    # Get two closest weight entries for interpolation
-    closest = subset.iloc[(subset["Weight"] - weight).abs().argsort()[:2]]
+    # Compute weighted distances to each data point
+    diffs = points - input_point
+    euclidean = np.linalg.norm(diffs, axis=1)
 
-    if len(closest) < 2:
-        return closest["Distance"].values[0], closest  # Fallback to single point
+    # Get nearest 4 neighbors for interpolation
+    nearest_idx = np.argsort(euclidean)[:4]
+    nearest_points = points[nearest_idx]
+    nearest_distances = distances[nearest_idx]
 
-    x = closest["Weight"].values
-    y = closest["Distance"].values
+    # Inverse distance weighting
+    weights = 1 / (euclidean[nearest_idx] + 1e-6)  # avoid division by zero
+    weighted_avg = np.dot(weights, nearest_distances) / np.sum(weights)
 
-    # Linear interpolation formula
-    interpolated = y[0] + (weight - x[0]) * (y[1] - y[0]) / (x[1] - x[0])
-    return interpolated, closest
-
-
-def get_wind_adjustment(wind_knots, weight):
-    # Only head/tailwind from OEM reference (approximation)
-    if wind_knots == 0:
-        return 0
-    elif wind_knots > 0:
-        # Headwind adjustment: ~220 ft per 10 kt
-        return int((wind_knots / 10) * 220)
-    else:
-        # Tailwind penalty: ~300 ft per 10 kt
-        return -int((abs(wind_knots) / 10) * 300)
+    return weighted_avg, df.iloc[nearest_idx]
