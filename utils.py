@@ -1,33 +1,47 @@
 import numpy as np
 
 def interpolate_distance(df, weight, altitude, temperature):
-    # Pivot to 3D grid
-    points = df[["Weight", "PressureAltitude", "OAT"]].values
-    distances = df["Distance"].values
+    # Round inputs down to nearest OEM steps
+    w_vals = sorted(df["Weight"].unique())
+    pa_vals = sorted(df["PressureAltitude"].unique())
+    oat_vals = sorted(df["OAT"].unique())
 
-    # Build input vector
-    input_point = np.array([weight, altitude, temperature])
+    def find_bounds(val, grid):
+        lower = max([v for v in grid if v <= val])
+        upper = min([v for v in grid if v >= val])
+        return lower, upper
 
-    # Compute weighted distances to each data point
-    diffs = points - input_point
-    euclidean = np.linalg.norm(diffs, axis=1)
+    w0, w1 = find_bounds(weight, w_vals)
+    pa0, pa1 = find_bounds(altitude, pa_vals)
+    oat0, oat1 = find_bounds(temperature, oat_vals)
 
-    # Get nearest 4 neighbors for interpolation
-    nearest_idx = np.argsort(euclidean)[:4]
-    nearest_points = points[nearest_idx]
-    nearest_distances = distances[nearest_idx]
+    # Get distances from all 8 corners
+    cube_points = []
+    for w in (w0, w1):
+        for pa in (pa0, pa1):
+            for oat in (oat0, oat1):
+                match = df[
+                    (df["Weight"] == w) &
+                    (df["PressureAltitude"] == pa) &
+                    (df["OAT"] == oat)
+                ]
+                if match.empty:
+                    return 0, []  # Invalid combo—prevent crash
+                cube_points.append(match.iloc[0]["Distance"])
 
-    # Inverse distance weighting
-    weights = 1 / (euclidean[nearest_idx] + 1e-6)  # avoid division by zero
-    weighted_avg = np.dot(weights, nearest_distances) / np.sum(weights)
+    # Normalize interpolation factors
+    xd = (weight - w0) / (w1 - w0) if w1 != w0 else 0
+    yd = (altitude - pa0) / (pa1 - pa0) if pa1 != pa0 else 0
+    zd = (temperature - oat0) / (oat1 - oat0) if oat1 != oat0 else 0
 
-    return weighted_avg, df.iloc[nearest_idx]
+    # Trilinear interpolation formula
+    def lerp(a, b, t): return a + (b - a) * t
 
+    i = lambda a,b,c,d,e,f,g,h: lerp(
+        lerp(lerp(a, b, xd), lerp(c, d, xd), yd),
+        lerp(lerp(e, f, xd), lerp(g, h, xd), yd),
+        zd
+    )
 
-def get_wind_adjustment(wind_knots, weight):
-    if wind_knots == 0:
-        return 0
-    elif wind_knots > 0:
-        return int((wind_knots / 10) * 220)  # Headwind bonus
-    else:
-        return -int((abs(wind_knots) / 10) * 300)  # Tailwind penalty
+    interpolated = i(*cube_points)
+    return interpolated, cube_points
