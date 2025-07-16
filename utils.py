@@ -1,22 +1,33 @@
 def interpolate_distance(df, weight, altitude, temperature):
-    # Filter dataframe for closest matching PA and temp
     subset = df[
         (df["PressureAltitude"] == altitude) &
         (df["OAT"] == temperature)
     ]
-    # Interpolate distance based on weight
+
+    if subset.empty:
+        return 0, []  # No matching data at all
+
+    # Get two closest weight entries for interpolation
     closest = subset.iloc[(subset["Weight"] - weight).abs().argsort()[:2]]
-    x = closest["Weight"]
-    y = closest["Distance"]
-    interpolated = y.iloc[0] + (weight - x.iloc[0]) * (y.iloc[1] - y.iloc[0]) / (x.iloc[1] - x.iloc[0])
-    return interpolated
+
+    if len(closest) < 2:
+        return closest["Distance"].values[0], closest  # Fallback to single point
+
+    x = closest["Weight"].values
+    y = closest["Distance"].values
+
+    # Linear interpolation formula
+    interpolated = y[0] + (weight - x[0]) * (y[1] - y[0]) / (x[1] - x[0])
+    return interpolated, closest
+
 
 def get_wind_adjustment(wind_knots, weight):
-    # Chart-based headwind correction only
-    wind = max(min(wind_knots, 30), -30)
-    if wind == 0:
+    # Only head/tailwind from OEM reference (approximation)
+    if wind_knots == 0:
         return 0
-    if wind > 0:
-        return int(220 * (wind / 10))  # Headwind: up to ~660 ft reduction
+    elif wind_knots > 0:
+        # Headwind adjustment: ~220 ft per 10 kt
+        return int((wind_knots / 10) * 220)
     else:
-        return -int(300 * (abs(wind) / 10))  # Tailwind: up to ~900 ft penalty
+        # Tailwind penalty: ~300 ft per 10 kt
+        return -int((abs(wind_knots) / 10) * 300)
