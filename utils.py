@@ -22,3 +22,12 @@ def interpolate_distance(df, weight, altitude, temperature):
     weighted_avg = np.dot(weights, nearest_distances) / np.sum(weights)
 
     return weighted_avg, df.iloc[nearest_idx]
+
+
+def get_wind_adjustment(wind_knots, weight):
+    if wind_knots == 0:
+        return 0
+    elif wind_knots > 0:
+        return int((wind_knots / 10) * 220)  # Headwind bonus
+    else:
+        return -int((abs(wind_knots) / 10) * 300)  # Tailwind penalty
