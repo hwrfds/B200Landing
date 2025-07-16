@@ -27,4 +27,13 @@ st.metric("Wind Correction", f"-{wind_adjust:.0f} ft" if wind > 0 else f"+{abs(w
 st.metric("Estimated Final Landing Distance", f"{final_distance:.0f} ft")
 
 # Plot
-fig, ax
+fig, ax = plt.subplots()
+ax.scatter(weight, final_distance, color='red', label='Your Scenario')
+ax.plot(chart_df["Weight"], chart_df["Distance"], color='blue', label='OEM Curve')
+ax.set_xlabel("Landing Weight (lbs)")
+ax.set_ylabel("Distance over 50 ft Obstacle (ft)")
+ax.legend()
+st.pyplot(fig)
+
+# Footer
+st.caption("Data derived from April 2007 OEM charts. Wind adjustment is chart-faithful.")
