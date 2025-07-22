@@ -6,8 +6,8 @@ from utils import interpolate_distance, get_wind_adjustment
 # Load OEM data
 chart_df = pd.read_csv("charts/landing_curve.csv")
 
-st.set_page_config(page_title="RFDS B200 Landing Distance Estimator", layout="wide")
-st.title("🛬 RFDS B200 Landing Distance Estimator")
+st.set_page_config(page_title="RFDS B200 Landing Distance", layout="wide")
+st.title("🛬 RFDS B200 Landing Distance")
 
 # Sidebar Inputs
 st.sidebar.header("Flight Parameters")
@@ -22,9 +22,9 @@ wind_adjust = get_wind_adjustment(wind, weight)
 final_distance = raw_distance - wind_adjust
 
 # Output
-st.metric("Unadjusted Landing Distance", f"{raw_distance:.0f} ft")
-st.metric("Wind Correction", f"{'-' if wind > 0 else '+'}{abs(wind_adjust):.0f} ft")
-st.metric("Estimated Final Distance", f"{final_distance:.0f} ft")
+st.metric("Landing Distance", f"{raw_distance:.0f} ft")
+st.metric("Wind Component", f"{'-' if wind > 0 else '+'}{abs(wind_adjust):.0f} ft")
+st.metric("Landing Distance with wind", f"{final_distance:.0f} ft")
 
 # Warning if fallback used
 if len(used_points) < 2:
@@ -40,4 +40,4 @@ ax.legend()
 st.pyplot(fig)
 
 # Footer
-st.caption("Chart data based on April 2007 OEM performance. Wind adjustments are strictly chart-referenced.")
+st.caption("Chart data based on April 2007 OEM performance. Not for operational use.")
